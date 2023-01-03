@@ -1,0 +1,30 @@
+// proto文件类似于一种约束，不仅放到server端，也放到client端
+// 想象成一种接口文件
+
+// 说明用的是proto3的语法
+syntax = "proto3";
+
+// 这部分的内容是关于最后生成的go文件是处在那个目录哪个包中，代表当前目录生成，service代表了生成go文件的包名是service
+// option不同参数用分号分隔
+option go_package = ".;service";
+
+// 然后我们需要定义一个服务（函数），在这个服务中需要有一个方法，这个方法可以接收客户端的参数，再返回服务端的响应
+// 定义了一个service,称为SayHello,这个服务中有一个rpc方法，名为SayHello
+// 这个方法会发送一个Hello Request，然后返回一个HelloResponse
+
+service SayHello {
+    // 这是一个rpc的远程调用接口
+    rpc SayHello(HelloRequest) returns (HelloResponse) {}
+}
+
+// message关键字，可以理解为Golang中的结构体
+// 这里比较特殊的是变量后面的赋值，注意，这里并不是赋值，而是定义这个变量再这个message中的位置
+message HelloRequest {
+    string requestName = 1;
+    string age = 2;
+    repeated string name = 3;
+}
+
+message HelloResponse {
+    string responseMsg = 1;
+}

